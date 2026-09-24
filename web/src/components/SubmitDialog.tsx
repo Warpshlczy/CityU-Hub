@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ExternalLink, FilePenLine, Keyboard, X } from 'lucide-react';
+import { ExternalLink, FilePenLine, GitFork, Keyboard, RefreshCw, X } from 'lucide-react';
+import { checkUserFork, type ForkCheckStatus } from '../api/github';
+import { REPO_URL } from '../constants/repo';
 import {
   TEMPLATE_SKELETON,
+  buildForkNewFileUrl,
   buildNewFileUrl,
   buildProjectMarkdown,
   isUrlTooLong,
@@ -9,7 +12,6 @@ import {
   toRepoFileName,
   type ProjectDraft,
 } from '../utils/submitTemplate';
-import { submitProject } from '../api/submit';
 
 const EMPTY_DRAFT: ProjectDraft = {
   title: '',
@@ -127,13 +129,12 @@ function draftFileName(draft: ProjectDraft) {
   return `${toRepoFileName(repo || draft.title)}.md`;
 }
 
-/** 提交入口弹窗：网页填表由本站直接开 PR，或去 GitHub 手写 */
+/** 提交入口弹窗：网页填表引导 fork 后自己开 PR，或去 GitHub 手写 */
 export function SubmitDialog({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<'choose' | 'form'>('choose');
   const [draft, setDraft] = useState<ProjectDraft>(EMPTY_DRAFT);
   const [errors, setErrors] = useState<string[]>([]);
-  const [pending, setPending] = useState(false);
-  const [created, setCreated] = useState<{ url: string; number: number } | null>(null);
+  const [forkState, setForkState] = useState<ForkCheckStatus | 'idle' | 'checking'>('idle');
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -156,6 +157,29 @@ export function SubmitDialog({ onClose }: { onClose: () => void }) {
     onClose();
   };
 
+  const openForkEditor = (fileName: string, content: string) => {
+    const url = buildForkNewFileUrl(draft.author, fileName, content);
+    if (isUrlTooLong(url)) {
+      setErrors(['内容太长，无法一次性带到 fork，请精简项目介绍后再提交']);
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+    onClose();
+  };
+
+  // 先确认填写的 GitHub 用户名是否 fork 了本站仓库，未 fork 就先引导 fork
+  const runForkCheck = async (fileName: string, content: string) => {
+    setForkState('checking');
+    const status = await checkUserFork(draft.author);
+    setForkState(status);
+    if (status === 'has-fork') {
+      // 已 fork：到自己在 fork 里的 feature 分支新建文件，提交即开 PR
+      openForkEditor(fileName, content);
+      return;
+    }
+    // 未 fork / 检测失败：停留在面板上引导用户先 fork
+  };
+
   const submitForm = async () => {
     const found = validateDraft(draft);
     setErrors(found);
@@ -163,21 +187,13 @@ export function SubmitDialog({ onClose }: { onClose: () => void }) {
 
     const fileName = `repos/${draftFileName(draft)}`;
     const content = buildProjectMarkdown(draft);
-
-    setPending(true);
-    const result = await submitProject({ fileName, content });
-    setPending(false);
-
-    if (result.status === 'created') {
-      setCreated({ url: result.url, number: result.number });
+    if (forkState === 'has-fork') {
+      // 已确认 fork：直接跳到 fork 编辑器（可重复点击）
+      openForkEditor(fileName, content);
       return;
     }
-    // 服务端没配好时退回 GitHub 原生流程，照样能提交，只是要先 fork
-    if (result.status === 'fallback') {
-      openGithub(fileName, content);
-      return;
-    }
-    setErrors([result.message]);
+    // 首次提交或点「我已 Fork，重新检测」：再查一次 fork 状态
+    await runForkCheck(fileName, content);
   };
 
   return (
@@ -197,7 +213,7 @@ export function SubmitDialog({ onClose }: { onClose: () => void }) {
               我也要提交项目
             </h2>
             <p className="mono mt-2 text-[11px] text-muted">
-              {mode === 'choose' ? '选择一种提交方式' : '填好后由本站直接开 PR，不用先 fork 仓库'}
+              {mode === 'choose' ? '选择一种提交方式' : '先确认你是否已 fork 本站并拉到 feature 分支'}
             </p>
           </div>
           <button
@@ -221,7 +237,7 @@ export function SubmitDialog({ onClose }: { onClose: () => void }) {
               <span className="flex flex-col gap-1.5">
                 <span className="pixel text-[10px] text-ink">网页填写</span>
                 <span className="mono text-[11px] text-muted">
-                  在这里填好字段，提交后由本站直接开 PR，不用 fork 仓库，也不必登录 GitHub。
+                  在这里填好字段，提交前会引导你先 fork 本站仓库并从 feature 分支提交。
                 </span>
               </span>
             </button>
@@ -244,28 +260,9 @@ export function SubmitDialog({ onClose }: { onClose: () => void }) {
               <ExternalLink className="mt-0.5 size-3.5 shrink-0 text-brand" />
               <span>
                 两种方式都会提 PR 到 <span className="text-ink">feature</span> 分支，合并后网站会自动更新。
-                网页填写由本站代你开 PR，不用 fork；去 GitHub 自己写则会由 GitHub 提示你先 fork。
+                网页填写会先引导你 fork 本站仓库并切到 feature 分支；去 GitHub 自己写则直接进入 GitHub 的编辑页。
               </span>
             </p>
-          </div>
-        ) : created ? (
-          <div className="mt-5 space-y-4">
-            <p className="mono text-[12px] text-ink">
-              PR #{created.number} 已经开好了，维护者合并后网站会自动收录。
-            </p>
-            <div className="flex flex-wrap items-center gap-3">
-              <a
-                href={created.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-brutal btn-brutal-primary"
-              >
-                在 GitHub 查看 PR
-              </a>
-              <button type="button" onClick={onClose} className="btn-brutal btn-brutal-secondary">
-                关闭
-              </button>
-            </div>
           </div>
         ) : (
           <>
@@ -344,14 +341,92 @@ export function SubmitDialog({ onClose }: { onClose: () => void }) {
               />
             </div>
 
+            {forkState === 'checking' && (
+              <p className="mono mt-5 flex items-center gap-2 border-[3px] border-accent bg-surface px-3 py-2 text-[11px] text-ink">
+                <RefreshCw className="size-3.5 animate-spin text-accent" />
+                正在检查 @{draft.author.trim() || '你'} 是否已 fork 本站并拉好 feature 分支…
+              </p>
+            )}
+
+            {(forkState === 'no-fork' || forkState === 'error') && (
+              <div className="mt-5 border-[3px] border-accent bg-surface p-4">
+                <div className="flex items-start gap-2">
+                  <GitFork className="mt-0.5 size-4 shrink-0 text-accent" />
+                  <div className="flex flex-col gap-1.5">
+                    <h3 className="pixel text-[10px] text-ink">
+                      {forkState === 'no-fork'
+                        ? `@${draft.author.trim() || '该用户'} 还没有 fork 本站仓库`
+                        : '暂时无法确认你是否已 fork'}
+                    </h3>
+                    <p className="mono text-[11px] text-muted">
+                      提交前请先完成下面 3 步，再点「我已 Fork」，生成结果会带到你 fork 的 feature 分支上。
+                    </p>
+                  </div>
+                </div>
+
+                <ol className="mono mt-3 space-y-2 text-[11px] text-ink">
+                  <li className="flex gap-2">
+                    <span className="size-4 shrink-0 border-[2px] border-ink text-center text-[9px] leading-4">1</span>
+                    <span>
+                      Fork 本站仓库：
+                      <a
+                        href={REPO_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-accent underline underline-offset-2"
+                      >
+                        {REPO_URL}
+                      </a>
+                    </span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="size-4 shrink-0 border-[2px] border-ink text-center text-[9px] leading-4">2</span>
+                    <span>
+                      在 fork 里切到 <span className="text-brand">feature</span> 分支（本地执行{' '}
+                      <code className="border border-ink bg-surface px-1">git fetch upstream feature</code>，或直接在 fork
+                      网页上查看 feature），确保与本站保持一致。
+                    </span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="size-4 shrink-0 border-[2px] border-ink text-center text-[9px] leading-4">3</span>
+                    <span>
+                      回到这里点「我已 Fork」，页面会带你把文件建到 fork 的 feature 分支，提交后开 PR 回本站。
+                    </span>
+                  </li>
+                </ol>
+
+                {forkState === 'error' && (
+                  <p className="mono mt-3 text-[10px] text-muted">检测接口暂时不可用，你可先 Fork 再重试检测。</p>
+                )}
+
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={submitForm}
+                    className="btn-brutal btn-brutal-primary"
+                  >
+                    我已 Fork，重新检测
+                  </button>
+                  <a
+                    href={REPO_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-brutal btn-brutal-secondary"
+                  >
+                    Fork 本站仓库
+                  </a>
+                </div>
+              </div>
+            )}
+
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={submitForm}
-                disabled={pending}
+                disabled={forkState === 'checking'}
                 className="btn-brutal btn-brutal-primary"
               >
-                {pending ? '开 PR 中…' : '生成 PR'}
+                {forkState === 'checking' ? '检查中…' : '生成提交链接'}
               </button>
               <button
                 type="button"
@@ -359,7 +434,7 @@ export function SubmitDialog({ onClose }: { onClose: () => void }) {
                   setErrors([]);
                   setMode('choose');
                 }}
-                disabled={pending}
+                disabled={forkState === 'checking'}
                 className="btn-brutal btn-brutal-secondary"
               >
                 返回

@@ -1,4 +1,5 @@
 import type { Project } from '../types';
+import { REPO_OWNER, REPO_NAME } from '../constants/repo';
 
 /** 从 GitHub 仓库接口补齐的字段 */
 interface GithubRepoMeta {
@@ -150,5 +151,42 @@ export async function enrichProjectsWithGithub(
     return changed ? merged : null;
   } catch {
     return null;
+  }
+}
+
+export type ForkCheckStatus = 'has-fork' | 'no-fork' | 'error';
+
+interface ForkInList {
+  owner?: { login?: string };
+}
+
+/**
+ * 按 GitHub 用户名查公开 API，判断该用户是否 fork 过本站仓库。
+ * 纯前端没有登录态，只能靠表单里填写的用户名来比对，GitHub 公开接口无需 token。
+ * 返回 'has-fork' / 'no-fork'；接口失败或限流时返回 'error' 交给调用方降级处理。
+ */
+export async function checkUserFork(username: string): Promise<ForkCheckStatus> {
+  const user = username.trim();
+  if (!user || !REPO_OWNER || !REPO_NAME) return 'no-fork';
+
+  // 最多翻几页，避免 fork 数量大时请求过多；公开接口匿名限流每小时 60 次
+  const MAX_PAGES = 3;
+  try {
+    for (let page = 1; page <= MAX_PAGES; page += 1) {
+      const res = await fetch(
+        `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/forks?per_page=100&page=${page}&sort=newest`,
+        { headers: { accept: 'application/vnd.github+json' } },
+      );
+      if (!res.ok) return 'error';
+      const forks = (await res.json()) as ForkInList[];
+      if (forks.some((fork) => fork.owner?.login?.toLowerCase() === user.toLowerCase())) {
+        return 'has-fork';
+      }
+      // 一页不满说明没有更多了
+      if (forks.length < 100) return 'no-fork';
+    }
+    return 'no-fork';
+  } catch {
+    return 'error';
   }
 }

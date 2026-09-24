@@ -1,4 +1,4 @@
-import { REPO_URL } from '../constants/repo';
+import { REPO_URL, REPO_NAME } from '../constants/repo';
 
 // 项目一律提到 feature 分支，再由 feature-to-main 工作流合入 main
 export const SUBMIT_BRANCH = 'feature';
@@ -64,6 +64,12 @@ export function toRepoFileName(raw: string) {
 // 无写权限时 GitHub 会自动 fork
 export function buildNewFileUrl(fileName: string, content: string) {
   return `${REPO_URL}/new/${SUBMIT_BRANCH}?filename=${encodeURIComponent(fileName)}&value=${encodeURIComponent(content)}`;
+}
+
+// 在用户自己的 fork 上、feature 分支新建文件；配合 fork 引导流程使用
+export function buildForkNewFileUrl(forkOwner: string, fileName: string, content: string) {
+  const owner = forkOwner.trim();
+  return `https://github.com/${owner}/${REPO_NAME}/new/${SUBMIT_BRANCH}?filename=${encodeURIComponent(fileName)}&value=${encodeURIComponent(content)}`;
 }
 
 // URL 过长 GitHub 会返回 414，超限就不跳转，改为提示用户精简
