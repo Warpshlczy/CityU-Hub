@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Check, ExternalLink, GitFork, Lock, RefreshCw, Send } from 'lucide-react';
 import { checkUserFork, type ForkCheckStatus } from '../api/github';
 import { Header } from '../components/Header';
-import { REPO_URL } from '../constants/repo';
+import { REPO_NAME, REPO_OWNER, REPO_URL } from '../constants/repo';
 import { setRouteMeta } from '../utils/seo';
 import {
+  SUBMIT_BRANCH,
   buildForkNewFileUrl,
   buildProjectMarkdown,
   isUrlTooLong,
@@ -317,7 +318,7 @@ function ForkGate({ username, onUsernameChange, onConfirm }: StepProps) {
 function SubmitForm({ confirmedUser, onRestart }: { confirmedUser: string; onRestart: () => void }) {
   const [draft, setDraft] = useState<ProjectDraft>({ ...EMPTY_DRAFT, author: confirmedUser });
   const [errors, setErrors] = useState<string[]>([]);
-  const [done, setDone] = useState<{ url: string } | null>(null);
+  const [done, setDone] = useState<{ url: string; fileName: string; compareUrl: string } | null>(null);
 
   const patch = (key: keyof ProjectDraft) => (value: string) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -334,25 +335,68 @@ function SubmitForm({ confirmedUser, onRestart }: { confirmedUser: string; onRes
       setErrors(['内容太长，无法一次性带到 fork，请精简项目介绍后再提交']);
       return;
     }
+    // 提交后回到本站与 fork 的 feature 分支之间 compare，即可开 PR
+    const compareUrl = `https://github.com/${REPO_OWNER}/${REPO_NAME}/compare/${SUBMIT_BRANCH}...${encodeURIComponent(confirmedUser)}:${SUBMIT_BRANCH}`;
     window.open(url, '_blank', 'noopener,noreferrer');
-    setDone({ url });
+    setDone({ url, fileName, compareUrl });
   };
 
   if (done) {
     return (
       <div className="space-y-4">
-        <p className="mono text-[12px] text-ink">
-          已在新的标签页打开你 fork 的 <span className="text-brand">feature</span> 分支新建文件。内容已预填，你确认无误后提交，即会开 PR 回本站。
+        <p className="mono border-l-[3px] border-brand bg-surface px-3 py-2 text-[12px] text-ink">
+          已打开你 fork 的 <span className="text-brand">feature</span> 分支新建文件，内容已预填。按下面 3 步操作，
+          就能把你的项目提交成回本站的 Pull Request。
         </p>
-        <div className="flex flex-wrap items-center gap-3">
+
+        <div className="border-[3px] border-line bg-surface p-4">
+          <h3 className="pixel text-[10px] text-ink">① 在你的 fork 里提交</h3>
+          <p className="mono mt-1.5 text-[11px] text-muted">
+            在刚打开的页面里看看内容（新文件 <code className="border border-ink bg-surface px-1">{done.fileName}</code>
+            ），滚动到底部，写一句提交说明（如新增项目 xxx），点
+            <span className="text-ink"> Commit changes</span>。这会提交到你自己的
+            <span className="text-brand"> {SUBMIT_BRANCH}</span> 分支。
+          </p>
           <a
             href={done.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-brutal btn-brutal-primary"
+            className="btn-brutal btn-brutal-rainbow mt-3"
           >
-            <ExternalLink className="size-4" /> 在 GitHub 打开
+            <ExternalLink className="size-4" /> 打开新建文件页
           </a>
+        </div>
+
+        <div className="border-[3px] border-line bg-surface p-4">
+          <h3 className="pixel text-[10px] text-ink">② Compare（对比分支）</h3>
+          <p className="mono mt-1.5 text-[11px] text-muted">
+            回到你的 fork 首页，GitHub 会在顶部提示「This branch is N commits ahead of CityU-Hub:feature」，点
+            <span className="text-ink"> Compare &amp; pull request</span>；或直接点下面的对比入口，保持 base =
+            本站 <span className="text-brand">feature</span>、compare = 你的 fork
+            <span className="text-accent"> {SUBMIT_BRANCH}</span>。
+          </p>
+          <a
+            href={done.compareUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-brutal btn-brutal-primary mt-3"
+          >
+            <GitFork className="size-4" /> 打开 Compare 页面
+          </a>
+        </div>
+
+        <div className="border-[3px] border-line bg-surface p-4">
+          <h3 className="pixel text-[10px] text-ink">③ 提交 Pull Request</h3>
+          <p className="mono mt-1.5 text-[11px] text-muted">
+            对比页面确认无误后，填上标题与说明，点 <span className="text-ink"> Create pull request</span>。
+            维护者 review 并合并到 <span className="text-brand">feature</span> 后，网站会自动收录你的项目（顺带会拿到徽章）。
+          </p>
+          <button type="button" onClick={() => window.open(done.compareUrl, '_blank', 'noopener,noreferrer')} className="btn-brutal btn-brutal-secondary mt-3">
+            已在 Compare 页面
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={() => {
@@ -360,7 +404,7 @@ function SubmitForm({ confirmedUser, onRestart }: { confirmedUser: string; onRes
               setDraft({ ...EMPTY_DRAFT, author: confirmedUser });
               setErrors([]);
             }}
-            className="btn-brutal btn-brutal-secondary"
+            className="btn-brutal btn-brutal-primary"
           >
             再提交一个
           </button>
