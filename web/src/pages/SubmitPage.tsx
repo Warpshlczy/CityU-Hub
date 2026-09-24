@@ -29,15 +29,9 @@ const EMPTY_DRAFT: ProjectDraft = {
   features: '',
 };
 
-// Brutalist 像素风 fork 指引示意图（text_to_image 生成，示意而非真实 GitHub 界面）
-const FORK_ILLUSTRATION =
-  'https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=' +
-  encodeURIComponent(
-    'Retro pixel art instructional diagram of GitHub forking: a repository page with a big FORK button highlighted in neon magenta, ' +
-      'a branch selector dropdown showing the feature branch, arrows pointing from fork button to a branch list labeled feature, ' +
-      'hard 3px black borders, chunky pixels, neon magenta and purple on dark background, brutalist design, no text labels, clean layout',
-  ) +
-  '&image_size=landscape_4_3';
+// fork 引导的两张本地截图：fork1 展示 Fork 按钮，fork2 展示切到 feature 分支
+const FORK_IMAGE_1 = `${import.meta.env.BASE_URL}fork1.png`;
+const FORK_IMAGE_2 = `${import.meta.env.BASE_URL}fork2.png`;
 
 interface FieldProps {
   label: string;
@@ -216,12 +210,26 @@ function ForkGate({ username, onUsernameChange, onConfirm }: StepProps) {
             </li>
           </ol>
 
-          <img
-            src={FORK_ILLUSTRATION}
-            alt="fork 并切换到 feature 分支的示意图"
-            loading="lazy"
-            className="mt-3 w-full border-2 border-line object-cover"
-          />
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <figure className="border-2 border-line bg-surface p-2">
+              <img
+                src={FORK_IMAGE_1}
+                alt="在 GitHub 页面点击 Fork 按钮，fork 本站仓库"
+                loading="lazy"
+                className="w-full border border-line object-cover"
+              />
+              <figcaption className="mono mt-2 text-center text-[10px] text-muted">① Fork 本站仓库</figcaption>
+            </figure>
+            <figure className="border-2 border-line bg-surface p-2">
+              <img
+                src={FORK_IMAGE_2}
+                alt="把 fork 切换到 feature 分支"
+                loading="lazy"
+                className="w-full border border-line object-cover"
+              />
+              <figcaption className="mono mt-2 text-center text-[10px] text-muted">② 切到 feature 分支</figcaption>
+            </figure>
+          </div>
         </div>
 
         <div className="flex flex-col gap-3 border-[3px] border-line bg-surface p-4 sm:flex-row sm:items-center">
