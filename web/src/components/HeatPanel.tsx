@@ -53,10 +53,8 @@ export function HeatPanel({ project, stats }: { project: Project; stats?: Projec
       </ul>
 
       <p className="mono mt-4 text-[10px] leading-5 text-muted">
-        热度满分 100，由 Star 总数、近 7 天涨星、站内浏览、跳转 GitHub 的点击、Fork 数
-        与最近更新时间加权算出。右侧是各维度的真实数量，进度条是它对热度的贡献；
-        显示「—」表示这一维暂时还没有数据。涨星靠站内每天记录一次，
-        攒够 7 天后才有值。站内数据是匿名计数，浏览器开启 Do Not Track 时不参与统计。
+        热度满分 100，由左侧六项加权算出；进度条是各维对热度的贡献，右侧是真实数量。
+        显示「—」表示该维暂无数据（涨星要站内攒够 7 天）；站内数据为匿名计数。
       </p>
     </section>
   );
