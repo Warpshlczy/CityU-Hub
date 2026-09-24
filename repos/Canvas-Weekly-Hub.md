@@ -2,7 +2,7 @@
 title: Canvas Weekly Hub（城大 Canvas 课程助手）
 author: Famalhaut04
 authorName: Fomal
-major: Computer Science
+major: Cybersecurity
 enrollmentYear: 2026
 repoUrl: https://github.com/Famalhaut04/canvas-weekly-hub
 homepageUrl: 'https://famalhaut04.github.io/canvas-weekly-hub/web/'
