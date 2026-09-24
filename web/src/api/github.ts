@@ -14,8 +14,8 @@ interface GithubRepoMeta {
 
 /** 缓存键带版本号，字段有增减时自动失效旧缓存 */
 const CACHE_KEY = 'cityu-hub:github-meta:v3';
-/** 缓存 6 小时，避免反复打 GitHub 匿名接口（每小时 60 次） */
-const CACHE_TTL = 6 * 60 * 60 * 1000;
+/** 缓存 1 小时：star 数按小时刷新，同时避开 GitHub 匿名接口的 60 次/小时限流 */
+const CACHE_TTL = 60 * 60 * 1000;
 /** 单次最多补这么多仓库，其余等下次访问 */
 const MAX_REQUESTS = 20;
 const CONCURRENCY = 4;
@@ -71,9 +71,11 @@ async function fetchRepoMeta(slug: string, signal?: AbortSignal): Promise<Github
 }
 
 /**
- * 用 GitHub 仓库接口补齐语言与 stars。
- * 只补后端没给到的项目，结果写入 localStorage 缓存；失败（限流 / 断网 / 404）时
- * 返回 null，调用方保持原数据不变。
+ * 用 GitHub 仓库接口补齐语言与 stars，结果写入 localStorage 缓存。
+ * 缓存超过 1 小时就重新拉一次，star 数因此按小时保持新鲜；
+ * 失败（限流 / 断网 / 404）时返回 null，调用方保持原数据不变。
+ *
+ * ponytail: 刷新挂在页面访问上，没人访问就不刷新；要「无访问也准时」得改成服务端定时任务。
  */
 export async function enrichProjectsWithGithub(
   projects: Project[],
@@ -94,8 +96,7 @@ export async function enrichProjectsWithGithub(
         metas.set(slug, cached.meta);
         continue;
       }
-      // 语言、stars、头像、仓库 About 都齐了就不用再请求
-      if (project.language && project.stars > 0 && project.authorAvatar && project.about) continue;
+      // 后端已经补齐过也照样重拉：star 数要按小时更新，不能一直用构建时的值
       if (queue.length >= MAX_REQUESTS || queue.some((item) => item.slug === slug)) continue;
       queue.push({ slug });
     }
