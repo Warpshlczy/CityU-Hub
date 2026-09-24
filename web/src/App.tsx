@@ -7,6 +7,7 @@ import { WelcomeDialog } from './components/WelcomeDialog';
 import { HomePage } from './pages/HomePage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ProjectDetailPage } from './pages/ProjectDetailPage';
+import { SubmitPage } from './pages/SubmitPage';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -50,6 +51,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/project/:id" element={<ProjectDetailPage />} />
+        <Route path="/submit" element={<SubmitPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       {/* 放在路由之外：直接落在详情页分享链接时也要能弹出来 */}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRight, BookOpen, HeartHandshake } from 'lucide-react';
-import { SubmitDialog } from './SubmitDialog';
 
 // 首访欢迎弹窗的「不再提示」标记；scripts/update-screenshot.mjs 有同名常量，改动时两处同步
 const DISMISS_KEY = 'cityu-hub:welcome-dismissed';
@@ -50,18 +50,24 @@ function writeDismissed() {
 
 /** 首次访问的欢迎弹窗，引导提交项目 */
 export function WelcomeDialog() {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [visible, setVisible] = useState(() => !readDismissed());
   const [neverShow, setNeverShow] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
-  if (!visible) return null;
+  // 提交页本身就是 fork 引导流程，不必再弹欢迎窗
+  if (!visible || pathname === '/submit') return null;
 
   const close = () => {
     if (neverShow) writeDismissed();
     setVisible(false);
   };
 
-  if (submitting) return <SubmitDialog onClose={close} />;
+  const goSubmit = () => {
+    if (neverShow) writeDismissed();
+    setVisible(false);
+    navigate('/submit');
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center">
@@ -114,7 +120,7 @@ export function WelcomeDialog() {
         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
           <button
             type="button"
-            onClick={() => setSubmitting(true)}
+            onClick={goSubmit}
             className="btn-brutal btn-brutal-rainbow w-full sm:w-auto"
           >
             <HeartHandshake className="size-4" />
