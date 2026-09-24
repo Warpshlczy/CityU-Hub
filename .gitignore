@@ -6,3 +6,6 @@ dist/
 
 # Vercel CLI 在本地 link 项目时生成
 .vercel/
+
+# Trae 的本地规则/配置，不随仓库走
+.trae/
