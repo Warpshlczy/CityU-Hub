@@ -11,7 +11,8 @@
     "dev": "npm run parse && vite",
     "build": "npm run parse && npm run compile",
     "build:online": "npm run parse:online && npm run compile",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test \"test/*.test.ts\""
   },
   "dependencies": {
     "lucide-react": "^1.47.0",

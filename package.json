@@ -17,7 +17,7 @@
     "dev": "npm run dev --workspace web",
     "preview": "npm run preview --workspace web",
     "validate": "npm run validate --workspace repos-parser",
-    "test": "npm test --workspace repos-parser"
+    "test": "npm test --workspaces --if-present"
   },
   "allowScripts": {
     "esbuild@0.25.12": true
